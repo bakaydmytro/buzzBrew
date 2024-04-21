@@ -1,5 +1,7 @@
 from django.urls import path
-from .views import Home, UserRegistrationView, UserLoginView, AccountListCreateView, AccountRetrieveDestroyView
+from .views import Home, UserRegistrationView, UserLoginView, AccountListCreateView, AccountRetrieveDestroyView, FecebookedirectUrlView, FacebookOauth2Login
+
+
 
 
 urlpatterns = [
@@ -8,4 +10,6 @@ urlpatterns = [
     path('/login', UserLoginView.as_view(),name='user-login'),
     path('/accounts', AccountListCreateView.as_view(), name='account-list-create'),
     path('/accounts/<int:pk>', AccountRetrieveDestroyView.as_view(), name='account-retrieve-destroy'),
+    path('/login/oauth2/facebook', FacebookOauth2Login.as_view(), name='login-oauth'),
+    path('/login/oauth2/facebook/redirect', FecebookedirectUrlView.as_view(), name='redirect-oauth-url'),
 ]

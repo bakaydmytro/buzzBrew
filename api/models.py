@@ -7,6 +7,8 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
+    access_token = models.CharField(max_length=255, default='')
+    instagram_user_id = models.CharField(max_length=50, default='')
 
 #TODO check if needed
     def save(self, *args, **kwargs):
