@@ -1,9 +1,8 @@
-from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from rest_framework_jwt.settings import api_settings
 from django.core.exceptions import ValidationError
-from .models import Account, Job
+from rest_framework import serializers
 
+from .models import Account
 
 User = get_user_model()
 
