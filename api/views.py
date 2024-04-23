@@ -16,7 +16,14 @@ import os
 from dotenv import load_dotenv
 import requests
 from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
+from .models import User
+from django.http import HttpResponseRedirect
+from django.conf import settings
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 
+import jwt
 
 load_dotenv()
 
@@ -45,7 +52,7 @@ class UserRegistrationView(APIView):
             refresh = RefreshToken.for_user(user)
             access_token = str(refresh.access_token)
             
-            return Response({'token': access_token}, status=status.HTTP_201_CREATED)
+            return Response({'token': access_token, "user_id": user.id}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 class UserLoginView(APIView):
@@ -70,11 +77,12 @@ class UserLoginView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class FacebookOauth2Login(APIView):
+    permission_classes = [AllowAny]
     def get(self, request):
-        # user_mail = request.user.email
-        user_mail = 'user@mail.com'
-        format_base_url = f"{oauth2_base_url}/dialog/oauth?client_id={client_id}&redirect_uri={redirect_uri}&config_id={config_id}&state={user_mail}"
-        return redirect(format_base_url)
+        token = request.GET.get('userAccessToken')
+        print("USER TOKEN FROM UI: "+ token)
+        format_base_url = f"{oauth2_base_url}/dialog/oauth?client_id={client_id}&redirect_uri={redirect_uri}&config_id={config_id}&state={token}"
+        return HttpResponseRedirect(format_base_url)
     
 class AccountListCreateView(generics.ListCreateAPIView):
     queryset = Account.objects.all()
@@ -92,21 +100,27 @@ class AccountListByUserView(generics.ListAPIView):
         return Account.objects.filter(user_id=user_id)
     
 class FecebookedirectUrlView(APIView):
+    permission_classes = [AllowAny]
     def get(self, request):
         oauth_code = request.query_params.get('code', None)
-        user_email = request.query_params.get('state', None)
+        token = request.query_params.get('state', None)
         user_id = None
-        print('USER EMAIL: '+ user_email)
-        if oauth_code and user_email:
+        try:
+            decoded_token = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+            user_id = decoded_token.get('user_id')
+        except Exception as e:
+            print("Error parse user token", str(e))
+
+        print('USER ID: '+ str(user_id))
+        if oauth_code and user_id:
             try:
                 access_token = getAccessToken(oauth_code)
                 ig_id = getInstagramUserId(access_token)
 
-                user = get_user_model().objects.get(username=user_email)
+                user = get_user_model().objects.get(id=user_id)
                 user.access_token = access_token
                 user.instagram_user_id = ig_id
                 user.save()
-                user_id = user.id
             except Exception as e:
                 print('Error to get user data', str(e))
         else:
@@ -165,3 +179,59 @@ def getFacebookPageId(access_token):
         print('Error to get accounts data')
     return None
 
+class UserDataView(APIView):
+    def get(self,request, id):
+        user = get_object_or_404(User, id=id)   
+        need_facebook_auth = user.instagram_user_id is None or user.instagram_user_id == "" or user.access_token is None or user.access_token == ""       
+        user_data = {
+            "id": user.id,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "needFacebookAuth": need_facebook_auth
+        }
+    
+        return Response(user_data, status=status.HTTP_200_OK) 
+
+class CreateInstagramPost(APIView):
+    def post(self, request):
+        print('gettin post reqest')
+        data = request.data
+        user = request.user
+        instagram_media_response = createInstagramMediaContainer(data, user)
+        if instagram_media_response.status_code == 200:
+            json = instagram_media_response.json()
+            print("JSON")
+            print(json)
+            media_container_id = json.get('id')
+            publishMediaContainer(media_container_id, user)
+        else:
+            print("Error to create instagram media record")
+        return Response("SUCCESS")
+    
+
+def createInstagramMediaContainer(request_data, user):
+    instagram_media_url = f"{graph_base_url}/{user.instagram_user_id}/media"
+    data = {
+        "image_url": request_data.get('image_url'),
+        "caption": request_data.get('description'),
+        "access_token": user.access_token
+    }
+    response = requests.post(instagram_media_url, data)
+    print("Response from media:")
+    print(response)
+    return response
+
+def publishMediaContainer(containter_id, user):
+    publish_media_url = f"{graph_base_url}/{user.instagram_user_id}/media_publish"
+    print(publish_media_url)
+    data = {
+        "creation_id": containter_id,
+        "access_token": user.access_token
+    }
+    print('Publishing media container')
+    print(data)
+    response = requests.post(publish_media_url, data)
+    print('Response from publishing container:')
+    print(response)
+    return response

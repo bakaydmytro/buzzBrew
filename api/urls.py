@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import Home, UserRegistrationView, UserLoginView, AccountListCreateView, AccountRetrieveDestroyView, FecebookedirectUrlView, FacebookOauth2Login
+from .views import Home, UserRegistrationView, UserLoginView, AccountListCreateView, AccountRetrieveDestroyView, FecebookedirectUrlView, FacebookOauth2Login, UserDataView, CreateInstagramPost
 
 
 
@@ -12,4 +12,6 @@ urlpatterns = [
     path('/accounts/<int:pk>', AccountRetrieveDestroyView.as_view(), name='account-retrieve-destroy'),
     path('/login/oauth2/facebook', FacebookOauth2Login.as_view(), name='login-oauth'),
     path('/login/oauth2/facebook/redirect', FecebookedirectUrlView.as_view(), name='redirect-oauth-url'),
+    path('/user/<int:id>', UserDataView.as_view(), name='user-data-view'),
+    path('/posts/create', CreateInstagramPost.as_view(), name='create-instagram-post' ),
 ]
